@@ -10,6 +10,27 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    hsn: {
+      type: String,
+      required: false,
+    },
+    unit: {
+      type: String,
+      required: false,
+    },
+    brand: {
+      type: String,
+      required: false,
+    },
+    taxableRate: {
+      type: Number,
+      required: false,
+    },
+    taxPercent: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
     barcode: {
       type: String,
       required: false,
@@ -65,6 +86,54 @@ const productSchema = new mongoose.Schema(
       discount: {
         type: Number,
         required: false,
+      },
+    },
+    bulkPricing: {
+      bulkRate1: {
+        quantity: {
+          type: Number,
+          required: false,
+        },
+        pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+      },
+      bulkRate2: {
+        quantity: {
+          type: Number,
+          required: false,
+        },
+        pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+      },
+    },
+    promoPricing: {
+      singleUnit: {
+        type: Number,
+        required: false,
+      },
+      bulkRate1: {
+        quantity: {
+          type: Number,
+          required: false,
+        },
+        pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+      },
+      bulkRate2: {
+        quantity: {
+          type: Number,
+          required: false,
+        },
+        pricePerUnit: {
+          type: Number,
+          required: false,
+        },
       },
     },
     variants: [{}],

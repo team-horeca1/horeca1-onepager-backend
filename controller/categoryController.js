@@ -2,7 +2,12 @@ const Category = require("../models/Category");
 
 const addCategory = async (req, res) => {
   try {
-    const newCategory = new Category(req.body);
+    // Ensure all categories are parent categories (no parentId)
+    const categoryData = {
+      ...req.body,
+      parentId: null, // Explicitly set to null to ensure it's a parent category
+    };
+    const newCategory = new Category(categoryData);
     await newCategory.save();
     res.status(200).send({
       message: "Category Added Successfully!",
@@ -37,14 +42,34 @@ const addAllCategory = async (req, res) => {
 // get status show category
 const getShowingCategory = async (req, res) => {
   try {
-    // console.log("getShowingCategory");
-
-    const categories = await Category.find({ status: "show" }).sort({
+    // Get all parent categories with status "show"
+    const categories = await Category.find({ 
+      status: "show",
+      $or: [
+        { parentId: { $exists: false } },
+        { parentId: null },
+        { parentId: "" }
+      ]
+    }).sort({
       _id: -1,
     });
 
-    const categoryList = readyToParentAndChildrenCategory(categories);
-    // console.log("category list", categoryList.length);
+    // Return in the format expected by frontend: wrap in array with children property
+    // Frontend expects categories[0].children, so we wrap all categories as children of a dummy parent
+    const categoryList = [{
+      _id: "root",
+      name: { en: "All Categories" },
+      children: categories.map(cat => ({
+        _id: cat._id,
+        name: cat.name,
+        description: cat.description,
+        icon: cat.icon,
+        status: cat.status,
+        parentId: cat.parentId,
+        children: [] // Empty children array since all are parent categories
+      }))
+    }];
+    
     res.send(categoryList);
   } catch (err) {
     res.status(500).send({
@@ -70,9 +95,18 @@ const getAllCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
-    const categories = await Category.find({}).sort({ _id: -1 });
+    // Get all categories - return only parent categories
+    // Filter out any categories that have a parentId set (those are subcategories)
+    const allCategories = await Category.find({}).sort({ _id: -1 });
+    
+    // Filter to show only parent categories (where parentId is null, undefined, empty, or doesn't exist)
+    const parentCategories = allCategories.filter(cat => {
+      const parentId = cat.parentId;
+      // Return true if parentId is falsy or empty
+      return !parentId || parentId === null || parentId === undefined || parentId === "";
+    });
 
-    res.send(categories);
+    res.send(parentCategories);
   } catch (err) {
     res.status(500).send({
       message: err.message,
@@ -103,10 +137,9 @@ const updateCategory = async (req, res) => {
       };
       category.icon = req.body.icon;
       category.status = req.body.status;
-      category.parentId = req.body.parentId
-        ? req.body.parentId
-        : category.parentId;
-      category.parentName = req.body.parentName;
+      // Ensure category remains a parent category (no parentId)
+      category.parentId = null;
+      category.parentName = req.body.parentName || null;
 
       await category.save();
       res.send({ message: "Category Updated Successfully!" });

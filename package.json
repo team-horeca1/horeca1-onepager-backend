@@ -9,6 +9,11 @@
     "production": "NODE_ENV=production nodemon api/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "data:import": "node script/seed.js",
+    "check-db": "node script/check-db.js",
+    "fix-categories": "node script/fix-categories.js",
+    "cleanup-categories": "node script/keep-only-main-categories.js",
+    "cleanup-products": "node script/keep-only-qualita-product.js",
+    "update-currency": "node script/update-currency-to-rupee.js",
     "product": "node script/product.js",
     "generate-password": "node script/script.js",
     "generate-reviews": "node script/reviews.js"

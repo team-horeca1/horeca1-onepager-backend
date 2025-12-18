@@ -14,9 +14,19 @@ const connectDB = async () => {
   }
 
   try {
-    await mongoose.connect(mongoUri);
+    // Ensure we connect to the horeca1 database
+    let connectionString = mongoUri;
+    // If the URI doesn't end with a database name, add /horeca1
+    if (!connectionString.match(/\/[^\/\?]+(\?|$)/)) {
+      connectionString = connectionString.replace(/\/(\?|$)/, '/horeca1$1');
+    } else {
+      // Replace any existing database name with horeca1
+      connectionString = connectionString.replace(/\/[^\/\?]+(\?|$)/, '/horeca1$1');
+    }
+    
+    await mongoose.connect(connectionString);
     isConnected = true;
-    console.log("MongoDB connected!");
+    console.log("MongoDB connected to database:", mongoose.connection.db.databaseName);
   } catch (err) {
     console.error("MongoDB failed:", err.message);
     isConnected = false;

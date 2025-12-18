@@ -9,9 +9,7 @@ const addProduct = async (req, res) => {
     const newProduct = new Product({
       ...req.body,
       // productId: cname + (count + 1),
-      productId: req.body.productId
-        ? req.body.productId
-        : mongoose.Types.ObjectId(),
+      productId: req.body.productId || new mongoose.Types.ObjectId().toString(),
     });
 
     await newProduct.save();
@@ -168,6 +166,11 @@ const updateProduct = async (req, res) => {
 
       product.productId = req.body.productId;
       product.sku = req.body.sku;
+      product.hsn = req.body.hsn;
+      product.unit = req.body.unit;
+      product.brand = req.body.brand;
+      product.taxableRate = req.body.taxableRate;
+      product.taxPercent = req.body.taxPercent;
       product.barcode = req.body.barcode;
       product.slug = req.body.slug;
       product.categories = req.body.categories;
@@ -177,6 +180,8 @@ const updateProduct = async (req, res) => {
       product.variants = req.body.variants;
       product.stock = req.body.stock;
       product.prices = req.body.prices;
+      product.bulkPricing = req.body.bulkPricing || product.bulkPricing;
+      product.promoPricing = req.body.promoPricing || product.promoPricing;
       product.image = req.body.image;
       product.tag = req.body.tag;
 
