@@ -19,6 +19,9 @@ const {
   getShippingAddress,
   updateShippingAddress,
   deleteShippingAddress,
+  sendOTPForLogin,
+  verifyOTPAndLogin,
+  resendOTPForLogin,
 } = require("../controller/customerController");
 const {
   passwordVerificationLimit,
@@ -31,6 +34,11 @@ router.post("/verify-email", emailVerificationLimit, verifyEmailAddress);
 
 //verify phone number
 router.post("/verify-phone", phoneVerificationLimit, verifyPhoneNumber);
+
+// OTP Authentication (Passwordless)
+router.post("/otp/send", sendOTPForLogin);
+router.post("/otp/verify", verifyOTPAndLogin);
+router.post("/otp/resend", resendOTPForLogin);
 
 // shipping address send to array
 router.post("/shipping/address/:id", addShippingAddress);

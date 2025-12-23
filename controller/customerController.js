@@ -15,6 +15,7 @@ const {
   forgetPasswordEmailBody,
 } = require("../lib/email-sender/templates/forget-password");
 const { sendVerificationCode } = require("../lib/phone-verification/sender");
+const { sendOTP, verifyOTP, resendOTP } = require("../lib/msg91/otp-service");
 
 const verifyEmailAddress = async (req, res) => {
   const isAdded = await Customer.findOne({ email: req.body.email });
@@ -392,24 +393,43 @@ const addShippingAddress = async (req, res) => {
     const customerId = req.params.id;
     const newShippingAddress = req.body;
 
-    // console.log("customerId", customerId);
+    // Extract name and email from shipping address for progressive profile completion
+    const { name, email, firstName, lastName } = newShippingAddress;
+    
+    // Combine firstName and lastName if name is not provided
+    const fullName = name || (firstName && lastName ? `${firstName} ${lastName}`.trim() : firstName || lastName);
 
-    // Find the customer by ID and update the shippingAddress field
+    // Find the customer
+    const customer = await Customer.findById(customerId);
+    if (!customer) {
+      return res.status(404).send({ message: "Customer not found." });
+    }
+
+    // Update customer profile progressively (only if not already set)
+    const updateFields = {
+      shippingAddress: newShippingAddress,
+    };
+
+    // Update name if provided and not already set
+    if (fullName && !customer.name) {
+      updateFields.name = fullName;
+    }
+
+    // Update email if provided and not already set
+    if (email && !customer.email) {
+      updateFields.email = email.toLowerCase();
+    }
+
+    // Update the customer
     const result = await Customer.updateOne(
       { _id: customerId },
-      {
-        $set: {
-          shippingAddress: newShippingAddress,
-        },
-      },
-      { upsert: true } // Create a new document if no document matches the filter
+      { $set: updateFields }
     );
 
-    // console.log("result", result);
-
-    if (result.modifiedCount > 0) {
+    if (result.modifiedCount > 0 || result.matchedCount > 0) {
       return res.send({
         message: "Shipping address added or updated successfully.",
+        profileUpdated: !!(fullName && !customer.name) || !!(email && !customer.email),
       });
     } else {
       return res.status(404).send({ message: "Customer not found." });
@@ -558,6 +578,181 @@ const deleteCustomer = (req, res) => {
   });
 };
 
+// ==================== OTP Authentication (Passwordless) ====================
+
+/**
+ * Send OTP for login/signup
+ * POST /api/customer/otp/send
+ * Body: { phone: "919876543210" }
+ */
+const sendOTPForLogin = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).send({
+        message: "Phone number is required",
+      });
+    }
+
+    // Clean phone number (remove spaces, dashes, etc.)
+    const cleanPhone = phone.replace(/\D/g, "");
+
+    // Validate phone number format
+    if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+      return res.status(400).send({
+        message: "Invalid phone number format. Please include country code.",
+      });
+    }
+
+    // Send OTP via MSG91
+    const result = await sendOTP(cleanPhone);
+
+    if (!result.success) {
+      return res.status(500).send({
+        message: result.message || "Failed to send OTP",
+      });
+    }
+
+    // Return success (include OTP in dev mode for testing)
+    const response = {
+      message: result.message || "OTP sent successfully",
+      phone: cleanPhone, // Return cleaned phone for frontend
+    };
+    
+    // Include OTP in response for dev/testing mode
+    if (result.otp) {
+      response.otp = result.otp;
+    }
+    
+    res.send(response);
+  } catch (err) {
+    console.error("Error sending OTP:", err);
+    res.status(500).send({
+      message: err.message || "Failed to send OTP",
+    });
+  }
+};
+
+/**
+ * Verify OTP and login/signup user
+ * POST /api/customer/otp/verify
+ * Body: { phone: "919876543210", otp: "123456" }
+ */
+const verifyOTPAndLogin = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    console.log(`📞 [verifyOTPAndLogin] Received request - phone: ${phone}, otp: ${otp}`);
+
+    if (!phone || !otp) {
+      return res.status(400).send({
+        message: "Phone number and OTP are required",
+      });
+    }
+
+    // Clean phone number
+    const cleanPhone = phone.replace(/\D/g, "");
+    console.log(`📞 [verifyOTPAndLogin] Cleaned phone: ${cleanPhone}`);
+
+    // Verify OTP via MSG91
+    const verifyResult = await verifyOTP(cleanPhone, otp);
+    console.log(`📞 [verifyOTPAndLogin] OTP verify result:`, verifyResult);
+
+    if (!verifyResult.success) {
+      console.log(`❌ [verifyOTPAndLogin] OTP verification failed`);
+      return res.status(400).send({
+        message: verifyResult.message || "Invalid OTP",
+      });
+    }
+
+    // Check if user exists
+    console.log(`📞 [verifyOTPAndLogin] Looking for customer with phone: ${cleanPhone}`);
+    let customer = await Customer.findOne({ phone: cleanPhone });
+    console.log(`📞 [verifyOTPAndLogin] Customer found:`, customer ? customer._id : "NOT FOUND");
+
+    // If user doesn't exist, create new user silently
+    if (!customer) {
+      console.log(`📞 [verifyOTPAndLogin] Creating new customer...`);
+      customer = new Customer({
+        phone: cleanPhone,
+        // name and email will be collected later when saving delivery address
+      });
+      try {
+        await customer.save();
+        console.log(`✅ New user created: ${cleanPhone}, ID: ${customer._id}`);
+      } catch (saveError) {
+        console.error(`❌ [verifyOTPAndLogin] Failed to save customer:`, saveError);
+        throw saveError;
+      }
+    }
+
+    // Generate tokens
+    console.log(`📞 [verifyOTPAndLogin] Generating tokens for customer: ${customer._id}`);
+    const accessToken = generateAccessToken(customer);
+    const refreshToken = generateRefreshToken(customer);
+    console.log(`📞 [verifyOTPAndLogin] Tokens generated, accessToken length: ${accessToken?.length}`);
+
+    // Return user data and tokens
+    const responseData = {
+      refreshToken,
+      token: accessToken,
+      _id: customer._id,
+      name: customer.name || null,
+      email: customer.email || null,
+      phone: customer.phone,
+      address: customer.address || null,
+      image: customer.image || null,
+      isNewUser: !customer.name || !customer.email, // Flag to indicate if profile needs completion
+      message: customer.name ? "Login successful" : "Account created successfully",
+    };
+    console.log(`📞 [verifyOTPAndLogin] Sending response:`, { ...responseData, token: '[HIDDEN]', refreshToken: '[HIDDEN]' });
+    res.send(responseData);
+  } catch (err) {
+    console.error("❌ [verifyOTPAndLogin] Error:", err);
+    res.status(500).send({
+      message: err.message || "Failed to verify OTP",
+    });
+  }
+};
+
+/**
+ * Resend OTP
+ * POST /api/customer/otp/resend
+ * Body: { phone: "919876543210" }
+ */
+const resendOTPForLogin = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).send({
+        message: "Phone number is required",
+      });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, "");
+
+    const result = await resendOTP(cleanPhone);
+
+    if (!result.success) {
+      return res.status(500).send({
+        message: result.message || "Failed to resend OTP",
+      });
+    }
+
+    res.send({
+      message: "OTP resent successfully",
+      phone: cleanPhone,
+    });
+  } catch (err) {
+    console.error("Error resending OTP:", err);
+    res.status(500).send({
+      message: err.message || "Failed to resend OTP",
+    });
+  }
+};
+
 module.exports = {
   loginCustomer,
   refreshToken,
@@ -577,4 +772,8 @@ module.exports = {
   getShippingAddress,
   updateShippingAddress,
   deleteShippingAddress,
+  // OTP Authentication
+  sendOTPForLogin,
+  verifyOTPAndLogin,
+  resendOTPForLogin,
 };

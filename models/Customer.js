@@ -4,7 +4,7 @@ const customerSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: false, // Will be collected when saving delivery address
     },
     image: {
       type: String,
@@ -68,13 +68,16 @@ const customerSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: true,
+      required: false, // Will be collected when saving delivery address
       unique: true,
+      sparse: true, // Allows multiple null values
       lowercase: true,
     },
     phone: {
       type: String,
-      required: false,
+      required: true, // Phone is now required for OTP auth
+      unique: true,
+      index: true,
     },
     password: {
       type: String,
