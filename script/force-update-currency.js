@@ -35,3 +35,4 @@ const forceUpdateCurrency = async () => {
 
 forceUpdateCurrency();
 
+

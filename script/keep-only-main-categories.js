@@ -75,3 +75,4 @@ const keepOnlyMainCategories = async () => {
 
 keepOnlyMainCategories();
 
+

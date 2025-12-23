@@ -62,3 +62,4 @@ const updateCurrencyToRupee = async () => {
 
 updateCurrencyToRupee();
 
+
