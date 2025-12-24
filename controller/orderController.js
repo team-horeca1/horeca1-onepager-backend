@@ -1,4 +1,5 @@
 const Order = require("../models/Order");
+const fs = require("fs");
 
 const getAllOrders = async (req, res) => {
   const {
@@ -77,11 +78,25 @@ const getAllOrders = async (req, res) => {
     const totalDoc = await Order.countDocuments(queryObject);
     const orders = await Order.find(queryObject)
       .select(
-        "_id invoice paymentMethod subTotal total user_info discount shippingCost status createdAt updatedAt"
+        "_id invoice paymentMethod subTotal total user_info discount shippingCost status createdAt updatedAt cart"
       )
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limits);
+    
+    // #region agent log
+    const fs = require('fs');
+    const logPath = 'c:\\Users\\Roger\\Desktop\\horeca1\\kachabazar\\.cursor\\debug.log';
+    try {
+      const ordersDebug = orders.map(o => ({
+        id: o._id,
+        invoice: o.invoice,
+        cartLength: o.cart?.length,
+        cartItems: o.cart?.slice(0, 2).map(i => ({id:i.id,title:i.title,sku:i.sku,hsn:i.hsn,unit:i.unit,brand:i.brand}))
+      }));
+      fs.appendFileSync(logPath, JSON.stringify({location:'orderController.js:78',message:'Orders fetched for admin',data:{ordersCount:orders.length,orders:ordersDebug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})+'\n');
+    } catch(e) {}
+    // #endregion
 
     let methodTotals = [];
     if (startDate && endDate) {
