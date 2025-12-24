@@ -61,7 +61,22 @@ const isAuth = async (req, res, next) => {
   // console.log("authorization", req.headers);
   console.log(`🔍isAuth ${req.method} : ${req.originalUrl}`);
   try {
+    // Check if authorization header exists
+    if (!authorization) {
+      return res.status(401).send({
+        message: "Authorization header is missing",
+      });
+    }
+
     const token = authorization.split(" ")[1];
+    
+    // Check if token exists after splitting
+    if (!token) {
+      return res.status(401).send({
+        message: "Token is missing from Authorization header",
+      });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
@@ -69,7 +84,7 @@ const isAuth = async (req, res, next) => {
     console.log("error on isAuth", err);
 
     res.status(401).send({
-      message: err.message,
+      message: err.message || "Authentication failed",
     });
   }
 };

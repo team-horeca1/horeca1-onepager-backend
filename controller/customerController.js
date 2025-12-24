@@ -1,6 +1,7 @@
 require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
 const Customer = require("../models/Customer");
 const {
   tokenForVerify,
@@ -405,20 +406,28 @@ const addShippingAddress = async (req, res) => {
       return res.status(404).send({ message: "Customer not found." });
     }
 
-    // Update customer profile progressively (only if not already set)
+    // Update customer profile - always update name and email when provided during checkout
     const updateFields = {
       shippingAddress: newShippingAddress,
     };
 
-    // Update name if provided and not already set
-    if (fullName && !customer.name) {
+    // Always update name if provided (not just if empty) - ensures profile updates after order
+    if (fullName) {
       updateFields.name = fullName;
     }
 
-    // Update email if provided and not already set
-    if (email && !customer.email) {
+    // Always update email if provided (not just if empty) - ensures profile updates after order
+    if (email) {
       updateFields.email = email.toLowerCase();
     }
+
+    // #region agent log
+    const fs = require('fs');
+    const logPath = 'c:\\Users\\Roger\\Desktop\\horeca1\\kachabazar\\.cursor\\debug.log';
+    try {
+      fs.appendFileSync(logPath, JSON.stringify({location:'customerController.js:408',message:'Updating customer profile',data:{customerId,updateFields,fullName,email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n');
+    } catch(e) {}
+    // #endregion
 
     // Update the customer
     const result = await Customer.updateOne(
@@ -426,10 +435,30 @@ const addShippingAddress = async (req, res) => {
       { $set: updateFields }
     );
 
+    // #region agent log
+    try {
+      fs.appendFileSync(logPath, JSON.stringify({location:'customerController.js:424',message:'Customer update result',data:{modifiedCount:result.modifiedCount,matchedCount:result.matchedCount,customerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n');
+    } catch(e) {}
+    // #endregion
+
     if (result.modifiedCount > 0 || result.matchedCount > 0) {
+      // Fetch updated customer to return
+      const updatedCustomer = await Customer.findById(customerId);
+      
+      // #region agent log
+      try {
+        fs.appendFileSync(logPath, JSON.stringify({location:'customerController.js:432',message:'Updated customer data',data:{customerId,name:updatedCustomer?.name,email:updatedCustomer?.email,phone:updatedCustomer?.phone},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n');
+      } catch(e) {}
+      // #endregion
+      
       return res.send({
         message: "Shipping address added or updated successfully.",
-        profileUpdated: !!(fullName && !customer.name) || !!(email && !customer.email),
+        profileUpdated: !!(fullName || email),
+        customer: {
+          name: updatedCustomer?.name,
+          email: updatedCustomer?.email,
+          phone: updatedCustomer?.phone,
+        },
       });
     } else {
       return res.status(404).send({ message: "Customer not found." });

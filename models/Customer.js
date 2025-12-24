@@ -68,9 +68,7 @@ const customerSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: false, // Will be collected when saving delivery address
-      unique: true,
-      sparse: true, // Allows multiple null values
+      required: false, // Collected later; do NOT enforce unique to allow null/duplicates
       lowercase: true,
     },
     phone: {
