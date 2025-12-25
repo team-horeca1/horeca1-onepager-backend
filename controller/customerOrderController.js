@@ -391,6 +391,7 @@ const sendEmailInvoiceToCustomer = async (req, res) => {
 
     // Send to customer if email is valid
     if (user?.email && MailChecker.isValid(user?.email)) {
+      console.log(`[Email] Sending invoice to customer: ${user.email} for order #${req.body.invoice}`);
       const customerBody = {
         from: fromEmail,
         to: user.email,
@@ -404,9 +405,12 @@ const sendEmailInvoiceToCustomer = async (req, res) => {
         ],
       };
       sendEmail(customerBody, null, `Invoice sent to customer ${user.name}`);
+    } else {
+      console.log(`[Email] Skipping customer email - email invalid or missing: ${user?.email}`);
     }
 
     // Always send to owner
+    console.log(`[Email] Sending order notification to owner: ${ownerEmail} for order #${req.body.invoice}`);
     const ownerBody = {
       from: fromEmail,
       to: ownerEmail,
