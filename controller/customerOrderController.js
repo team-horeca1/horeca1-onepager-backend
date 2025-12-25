@@ -9,7 +9,7 @@ const fs = require("fs");
 
 const Order = require("../models/Order");
 const Setting = require("../models/Setting");
-const { sendEmail } = require("../lib/email-sender/sender");
+const { sendEmail, sendEmailAsync } = require("../lib/email-sender/sender");
 const { formatAmountForStripe } = require("../lib/stripe/stripe");
 const { handleCreateInvoice } = require("../lib/email-sender/create");
 const { handleProductQuantity } = require("../lib/stock-controller/others");
@@ -389,42 +389,55 @@ const sendEmailInvoiceToCustomer = async (req, res) => {
     const fromEmail = req.body.company_info?.from_email || "sales@horeca1.com";
     const ownerEmail = "team.horeca1@gmail.com";
 
-    // Send to customer if email is valid
-    if (user?.email && MailChecker.isValid(user?.email)) {
-      console.log(`[Email] Sending invoice to customer: ${user.email} for order #${req.body.invoice}`);
-      const customerBody = {
-        from: fromEmail,
-        to: user.email,
-        subject: `Your Order #${req.body.invoice} - horeca1`,
-        html: customerInvoiceEmailBody(option),
-        attachments: [
-          {
-            filename: `${req.body.invoice}.pdf`,
-            content: pdf,
-          },
-        ],
-      };
-      sendEmail(customerBody, null, `Invoice sent to customer ${user.name}`);
-    } else {
-      console.log(`[Email] Skipping customer email - email invalid or missing: ${user?.email}`);
-    }
+    // Send emails asynchronously (fire and forget) to avoid blocking response in serverless
+    // This is important for Vercel/serverless environments where function may timeout
+    const sendEmailsPromise = (async () => {
+      try {
+        // Send to customer if email is valid
+        if (user?.email && MailChecker.isValid(user?.email)) {
+          console.log(`[Email] Sending invoice to customer: ${user.email} for order #${req.body.invoice}`);
+          const customerBody = {
+            from: fromEmail,
+            to: user.email,
+            subject: `Your Order #${req.body.invoice} - horeca1`,
+            html: customerInvoiceEmailBody(option),
+            attachments: [
+              {
+                filename: `${req.body.invoice}.pdf`,
+                content: pdf,
+              },
+            ],
+          };
+          await sendEmailAsync(customerBody, `Invoice sent to customer ${user.name}`);
+        } else {
+          console.log(`[Email] Skipping customer email - email invalid or missing: ${user?.email}`);
+        }
 
-    // Always send to owner
-    console.log(`[Email] Sending order notification to owner: ${ownerEmail} for order #${req.body.invoice}`);
-    const ownerBody = {
-      from: fromEmail,
-      to: ownerEmail,
-      subject: `New Order #${req.body.invoice} - ₹${req.body.total} from ${user?.name}`,
-      html: ownerOrderNotificationEmailBody(option),
-      attachments: [
-        {
-          filename: `${req.body.invoice}.pdf`,
-          content: pdf,
-        },
-      ],
-    };
-    
-    sendEmail(ownerBody, res, `Order notification sent to owner and customer`);
+        // Always send to owner
+        console.log(`[Email] Sending order notification to owner: ${ownerEmail} for order #${req.body.invoice}`);
+        const ownerBody = {
+          from: fromEmail,
+          to: ownerEmail,
+          subject: `New Order #${req.body.invoice} - ₹${req.body.total} from ${user?.name}`,
+          html: ownerOrderNotificationEmailBody(option),
+          attachments: [
+            {
+              filename: `${req.body.invoice}.pdf`,
+              content: pdf,
+            },
+          ],
+        };
+        await sendEmailAsync(ownerBody, `Order notification sent to owner`);
+      } catch (emailErr) {
+        console.error(`[Email] Error sending emails for order #${req.body.invoice}:`, emailErr.message);
+        // Don't throw - we don't want email failures to break the order response
+      }
+    })();
+
+    // Send response immediately, don't wait for emails (fire and forget)
+    res.send({
+      message: "Order notification emails are being sent",
+    });
   } catch (err) {
     res.status(500).send({
       message: err.message,
