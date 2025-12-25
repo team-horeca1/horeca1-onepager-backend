@@ -275,22 +275,6 @@ const getShowingStoreProducts = async (req, res) => {
     // console.log("getShowingStoreProducts");
 
     const { category, title, slug } = req.query;
-    // #region agent log - Backend debugging
-    const fs = require('fs');
-    const logPath = 'c:\\Users\\Roger\\Desktop\\horeca1\\kachabazar\\.cursor\\debug.log';
-    const logEntry = {
-      location: 'productController.js:277',
-      message: 'Backend received query params',
-      data: { category, title, slug },
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
-      hypothesisId: 'C'
-    };
-    try {
-      fs.appendFileSync(logPath, JSON.stringify(logEntry) + '\n');
-    } catch (e) {}
-    // #endregion
 
     if (category) {
       // Convert category string to ObjectId if it's a valid ObjectId
@@ -301,20 +285,6 @@ const getShowingStoreProducts = async (req, res) => {
       queryObject.categories = {
         $in: [categoryId],
       };
-      // #region agent log - Backend debugging
-      const logEntry2 = {
-        location: 'productController.js:295',
-        message: 'Category filter applied',
-        data: { category, categoryId: String(categoryId), queryObject: JSON.stringify(queryObject) },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'C'
-      };
-      try {
-        fs.appendFileSync(logPath, JSON.stringify(logEntry2) + '\n');
-      } catch (e) {}
-      // #endregion
     }
 
     if (title) {
@@ -357,20 +327,6 @@ const getShowingStoreProducts = async (req, res) => {
         .populate({ path: "category", select: "name _id" })
         .sort({ _id: -1 });
       // Removed limit to show all products when "See all" is clicked
-      // #region agent log - Backend debugging
-      const logEntry4 = {
-        location: 'productController.js:364',
-        message: 'All products returned (no filter)',
-        data: { productsCount: products.length },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'A'
-      };
-      try {
-        fs.appendFileSync(logPath, JSON.stringify(logEntry4) + '\n');
-      } catch (e) {}
-      // #endregion
       
       // Also include popular and discounted for home page use
       popularProducts = await Product.find({ status: "show" })
