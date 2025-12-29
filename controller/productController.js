@@ -282,9 +282,8 @@ const getShowingStoreProducts = async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(category)) {
         categoryId = new mongoose.Types.ObjectId(category);
       }
-      queryObject.categories = {
-        $in: [categoryId],
-      };
+      // Use primary category field instead of categories array to ensure products show only in their primary category
+      queryObject.category = categoryId;
     }
 
     if (title) {

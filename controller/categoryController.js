@@ -47,6 +47,10 @@ const addAllCategory = async (req, res) => {
 // get status show category
 const getShowingCategory = async (req, res) => {
   try {
+    // Ensure database connection is ready
+    const { ensureConnection } = require("../config/db");
+    await ensureConnection();
+    
     // Get all parent categories with status "show"
     const categories = await Category.find({ 
       status: "show",
@@ -87,6 +91,10 @@ const getShowingCategory = async (req, res) => {
 // get all category parent and child
 const getAllCategory = async (req, res) => {
   try {
+    // Ensure database connection is ready
+    const { ensureConnection } = require("../config/db");
+    await ensureConnection();
+    
     const categories = await Category.find({}).sort({ _id: -1 });
 
     const categoryList = readyToParentAndChildrenCategory(categories);
@@ -101,6 +109,10 @@ const getAllCategory = async (req, res) => {
 
 const getAllCategories = async (req, res) => {
   try {
+    // Ensure database connection is ready
+    const { ensureConnection } = require("../config/db");
+    await ensureConnection();
+    
     // Get all categories - return only parent categories
     // Filter out any categories that have a parentId set (those are subcategories)
     const allCategories = await Category.find({}).sort({ order: 1, _id: -1 });
