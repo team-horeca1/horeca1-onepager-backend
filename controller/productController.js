@@ -318,15 +318,15 @@ const getShowingStoreProducts = async (req, res) => {
     } else if (title || category) {
       products = await Product.find(queryObject)
         .populate({ path: "category", select: "name _id" })
-        .sort({ _id: -1 })
+        .sort({ order: 1, _id: -1 })
         .limit(100);
     } else {
       // When no category/title provided (e.g., "See all"), return ALL products
       products = await Product.find(queryObject)
         .populate({ path: "category", select: "name _id" })
-        .sort({ _id: -1 });
+        .sort({ order: 1, _id: -1 });
       // Removed limit to show all products when "See all" is clicked
-      
+
       // Also include popular and discounted for home page use
       popularProducts = await Product.find({ status: "show" })
         .populate({ path: "category", select: "name _id" })
@@ -399,6 +399,105 @@ const deleteManyProducts = async (req, res) => {
   }
 };
 
+// Update product order within a category
+const updateProductOrder = async (req, res) => {
+  try {
+    const { products } = req.body; // Array of { _id, order }
+
+    if (!Array.isArray(products)) {
+      return res.status(400).send({
+        message: "Products must be an array",
+      });
+    }
+
+    // Update all products with their new order
+    const updatePromises = products.map(({ _id, order }) => {
+      return Product.findByIdAndUpdate(
+        _id,
+        { order: order || 0 },
+        { new: true }
+      );
+    });
+
+    await Promise.all(updatePromises);
+
+    res.status(200).send({
+      message: "Product order updated successfully!",
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
+// Get products grouped by category for admin dashboard
+const getProductsByCategory = async (req, res) => {
+  try {
+    const categories = await Category.find({
+      $or: [
+        { parentId: { $exists: false } },
+        { parentId: null },
+        { parentId: "" }
+      ]
+    }).sort({ order: 1, _id: -1 });
+
+    const result = [];
+
+    for (const category of categories) {
+      const products = await Product.find({ category: category._id })
+        .populate({ path: "category", select: "_id name" })
+        .sort({ order: 1, _id: -1 });
+
+      result.push({
+        category: {
+          _id: category._id,
+          name: category.name,
+          icon: category.icon,
+          order: category.order,
+        },
+        products: products,
+        productCount: products.length,
+      });
+    }
+
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
+// Get count of products in a category (for delete confirmation)
+const getProductCountByCategory = async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const count = await Product.countDocuments({ category: categoryId });
+    res.send({ count });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
+// Delete all products in a category
+const deleteProductsByCategory = async (req, res) => {
+  try {
+    const categoryId = req.params.categoryId;
+    const result = await Product.deleteMany({ category: categoryId });
+    res.send({
+      message: `${result.deletedCount} products deleted successfully!`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
 module.exports = {
   addProduct,
   addAllProducts,
@@ -412,4 +511,9 @@ module.exports = {
   deleteProduct,
   deleteManyProducts,
   getShowingStoreProducts,
+  updateProductOrder,
+  getProductsByCategory,
+  getProductCountByCategory,
+  deleteProductsByCategory,
 };
+

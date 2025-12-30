@@ -13,6 +13,10 @@ const {
   deleteProduct,
   deleteManyProducts,
   getShowingStoreProducts,
+  updateProductOrder,
+  getProductsByCategory,
+  getProductCountByCategory,
+  deleteProductsByCategory,
 } = require("../controller/productController");
 
 //add a product
@@ -30,6 +34,12 @@ router.get("/show", getShowingProducts);
 //get showing products in store
 router.get("/store", getShowingStoreProducts);
 
+//get products grouped by category
+router.get("/by-category", getProductsByCategory);
+
+//get product count by category (for delete confirmation)
+router.get("/count/:categoryId", getProductCountByCategory);
+
 //get all products
 router.get("/", getAllProducts);
 
@@ -42,8 +52,14 @@ router.patch("/:id", updateProduct);
 //update many products
 router.patch("/update/many", updateManyProducts);
 
+// update product order
+router.put("/order/update", updateProductOrder);
+
 //update a product status
 router.put("/status/:id", updateStatus);
+
+//delete products by category
+router.delete("/by-category/:categoryId", deleteProductsByCategory);
 
 //delete a product
 router.delete("/:id", deleteProduct);
@@ -52,3 +68,4 @@ router.delete("/:id", deleteProduct);
 router.patch("/delete/many", deleteManyProducts);
 
 module.exports = router;
+
