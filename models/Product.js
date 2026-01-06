@@ -128,12 +128,20 @@ const productSchema = new mongoose.Schema(
         type: Number,
         required: false,
       },
+      singleUnitTaxable: {
+        type: Number,
+        required: false,
+      },
       bulkRate1: {
         quantity: {
           type: Number,
           required: false,
         },
         pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+        taxableRate: {
           type: Number,
           required: false,
         },
@@ -144,6 +152,10 @@ const productSchema = new mongoose.Schema(
           required: false,
         },
         pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+        taxableRate: {
           type: Number,
           required: false,
         },
