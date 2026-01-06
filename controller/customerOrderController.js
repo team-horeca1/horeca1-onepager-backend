@@ -32,6 +32,7 @@ const addOrder = async (req, res) => {
     let totalGst = 0;
     let itemsTotalGross = 0;
     let productSavings = 0;
+    let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
       req.body.cart.forEach(item => {
@@ -43,10 +44,23 @@ const addOrder = async (req, res) => {
         const itemCurrentGross = currentPrice * quantity;
         const itemOriginalGross = originalPrice * quantity;
 
-        const taxable = itemCurrentGross / (1 + taxPercent / 100);
-        const gst = itemCurrentGross - taxable;
+        // Taxable = Gross - GST, where GST = Gross × Tax%
+        // Use stored taxableRate from cart item (already calculated as Gross - GST per unit)
+        // Fallback: calculate from price if taxableRate not available
+        const itemTaxableRate = parseFloat(item.taxableRate);
+        let taxable, gst;
+        if (itemTaxableRate && itemTaxableRate > 0) {
+          // Use stored taxable rate
+          taxable = itemTaxableRate * quantity;
+          gst = itemCurrentGross - taxable;
+        } else {
+          // Fallback: calculate from gross price
+          gst = itemCurrentGross * (taxPercent / 100);
+          taxable = itemCurrentGross - gst;
+        }
 
         itemsTotalGross += itemCurrentGross;
+        totalTaxableAmount += taxable;
         totalGst += gst;
         productSavings += Math.max(0, itemOriginalGross - itemCurrentGross);
       });
@@ -61,7 +75,7 @@ const addOrder = async (req, res) => {
       user: req.user._id,
       invoice: nextInvoice,
       totalGst: totalGst,
-      taxableSubtotal: itemsTotalGross - totalGst,
+      taxableSubtotal: totalTaxableAmount,
       discount: totalDiscount,
       vat: totalGst,
     });
@@ -237,6 +251,7 @@ const addRazorpayOrder = async (req, res) => {
     let totalGst = 0;
     let itemsTotalGross = 0;
     let productSavings = 0;
+    let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
       req.body.cart.forEach(item => {
@@ -248,10 +263,23 @@ const addRazorpayOrder = async (req, res) => {
         const itemCurrentGross = currentPrice * quantity;
         const itemOriginalGross = originalPrice * quantity;
 
-        const taxable = itemCurrentGross / (1 + taxPercent / 100);
-        const gst = itemCurrentGross - taxable;
+        // Taxable = Gross - GST, where GST = Gross × Tax%
+        // Use stored taxableRate from cart item (already calculated as Gross - GST per unit)
+        // Fallback: calculate from price if taxableRate not available
+        const itemTaxableRate = parseFloat(item.taxableRate);
+        let taxable, gst;
+        if (itemTaxableRate && itemTaxableRate > 0) {
+          // Use stored taxable rate
+          taxable = itemTaxableRate * quantity;
+          gst = itemCurrentGross - taxable;
+        } else {
+          // Fallback: calculate from gross price
+          gst = itemCurrentGross * (taxPercent / 100);
+          taxable = itemCurrentGross - gst;
+        }
 
         itemsTotalGross += itemCurrentGross;
+        totalTaxableAmount += taxable;
         totalGst += gst;
         productSavings += Math.max(0, itemOriginalGross - itemCurrentGross);
       });
@@ -266,7 +294,7 @@ const addRazorpayOrder = async (req, res) => {
       user: req.user._id,
       invoice: nextInvoice,
       totalGst: totalGst,
-      taxableSubtotal: itemsTotalGross - totalGst,
+      taxableSubtotal: totalTaxableAmount,
       discount: totalDiscount,
       vat: totalGst,
     });

@@ -103,6 +103,10 @@ const productSchema = new mongoose.Schema(
           type: Number,
           required: false,
         },
+        taxableRate: {
+          type: Number,
+          required: false,
+        },
       },
       bulkRate2: {
         quantity: {
@@ -110,6 +114,10 @@ const productSchema = new mongoose.Schema(
           required: false,
         },
         pricePerUnit: {
+          type: Number,
+          required: false,
+        },
+        taxableRate: {
           type: Number,
           required: false,
         },
