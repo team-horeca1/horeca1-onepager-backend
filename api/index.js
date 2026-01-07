@@ -21,6 +21,7 @@ const settingRoutes = require("../routes/settingRoutes");
 const currencyRoutes = require("../routes/currencyRoutes");
 const languageRoutes = require("../routes/languageRoutes");
 const notificationRoutes = require("../routes/notificationRoutes");
+const bannerRoutes = require("../routes/bannerRoutes");
 const { isAuth, isAdmin } = require("../config/auth");
 // const {
 //   getGlobalSetting,
@@ -251,6 +252,7 @@ app.use("/v1/setting/", ensureDBConnection, settingRoutes);
 app.use("/v1/currency/", ensureDBConnection, isAuth, currencyRoutes);
 app.use("/v1/language/", ensureDBConnection, languageRoutes);
 app.use("/v1/notification/", ensureDBConnection, isAuth, notificationRoutes);
+app.use("/v1/banners/", ensureDBConnection, bannerRoutes);
 
 //if you not use admin dashboard then these two route will not needed.
 app.use("/v1/admin/", ensureDBConnection, adminRoutes);
