@@ -22,6 +22,10 @@ const customerSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    zipCode: {
+      type: String,
+      required: false,
+    },
 
     shippingAddress: {
       type: Object,

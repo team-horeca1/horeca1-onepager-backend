@@ -201,7 +201,7 @@ const addAllCustomers = async (req, res) => {
 // Admin Create Customer (No verification required)
 const adminCreateCustomer = async (req, res) => {
   try {
-    const { name, phone, email, address } = req.body;
+    const { name, phone, email, address, city, country, zipCode } = req.body;
 
     // Validate required fields
     if (!name || !phone) {
@@ -227,7 +227,24 @@ const adminCreateCustomer = async (req, res) => {
       phone: cleanPhone,
       email: email?.trim() || undefined,
       address: address?.trim() || undefined,
+      city: city?.trim() || undefined,
+      country: country?.trim() || undefined,
+      zipCode: zipCode?.trim() || undefined,
     });
+
+    // Also set shippingAddress for consistency with checkout
+    if (address || city || country || zipCode) {
+      newCustomer.shippingAddress = {
+        name: name.trim(),
+        contact: cleanPhone,
+        email: email?.trim() || "",
+        address: address?.trim() || "",
+        city: city?.trim() || "",
+        country: country?.trim() || "",
+        zipCode: zipCode?.trim() || "",
+        isDefault: true,
+      };
+    }
 
     await newCustomer.save();
 
@@ -239,6 +256,10 @@ const adminCreateCustomer = async (req, res) => {
         phone: newCustomer.phone,
         email: newCustomer.email,
         address: newCustomer.address,
+        city: newCustomer.city,
+        country: newCustomer.country,
+        zipCode: newCustomer.zipCode,
+        shippingAddress: newCustomer.shippingAddress,
         createdAt: newCustomer.createdAt,
         status: "Active",
       },
@@ -616,7 +637,7 @@ const deleteShippingAddress = async (req, res) => {
 
 const updateCustomer = async (req, res) => {
   try {
-    const { name, email, address, phone, image } = req.body;
+    const { name, email, address, city, country, zipCode, phone, image } = req.body;
 
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
@@ -649,7 +670,24 @@ const updateCustomer = async (req, res) => {
     customer.name = name;
     customer.email = email;
     customer.address = address;
+    customer.city = city;
+    customer.country = country;
+    customer.zipCode = zipCode;
     customer.image = image;
+
+    // Update shippingAddress for consistency
+    if (address || city || country || zipCode) {
+      customer.shippingAddress = {
+        name: name.trim(),
+        contact: cleanPhone || customer.phone,
+        email: email?.trim() || customer.email || "",
+        address: address?.trim() || "",
+        city: city?.trim() || "",
+        country: country?.trim() || "",
+        zipCode: zipCode?.trim() || "",
+        isDefault: true,
+      };
+    }
 
     await customer.save();
 
@@ -664,6 +702,10 @@ const updateCustomer = async (req, res) => {
       name: customer.name,
       email: customer.email,
       address: customer.address,
+      city: customer.city,
+      country: customer.country,
+      zipCode: customer.zipCode,
+      shippingAddress: customer.shippingAddress,
       phone: customer.phone,
       image: customer.image,
       message: "Customer updated successfully!",
