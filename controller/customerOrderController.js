@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 
 const Order = require("../models/Order");
+const Product = require("../models/Product");
 const Setting = require("../models/Setting");
 const { sendEmail, sendEmailAsync } = require("../lib/email-sender/sender");
 const { formatAmountForStripe } = require("../lib/stripe/stripe");
@@ -35,6 +36,20 @@ const addOrder = async (req, res) => {
     let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
+      // 1.5️⃣ Check stock for all items before proceeding
+      for (const item of req.body.cart) {
+        const product = await Product.findById(item._id);
+        if (!product) {
+          return res.status(404).send({ message: `Product ${item.title} not found!` });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).send({
+            message: `Insufficient stock for ${item.title}! Available: ${product.stock}, Requested: ${item.quantity}`,
+          });
+        }
+      }
+
       req.body.cart.forEach(item => {
         const quantity = item.quantity || 1;
         const taxPercent = parseFloat(item.taxPercent) || 0;
@@ -254,6 +269,20 @@ const addRazorpayOrder = async (req, res) => {
     let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
+      // 1.5️⃣ Check stock for all items before proceeding
+      for (const item of req.body.cart) {
+        const product = await Product.findById(item._id);
+        if (!product) {
+          return res.status(404).send({ message: `Product ${item.title} not found!` });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).send({
+            message: `Insufficient stock for ${item.title}! Available: ${product.stock}, Requested: ${item.quantity}`,
+          });
+        }
+      }
+
       req.body.cart.forEach(item => {
         const quantity = item.quantity || 1;
         const taxPercent = parseFloat(item.taxPercent) || 0;
