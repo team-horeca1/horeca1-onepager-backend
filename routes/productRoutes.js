@@ -17,6 +17,7 @@ const {
   getProductsByCategory,
   getProductCountByCategory,
   deleteProductsByCategory,
+  updateStock,
 } = require("../controller/productController");
 
 //add a product
@@ -57,6 +58,9 @@ router.put("/order/update", updateProductOrder);
 
 //update a product status
 router.put("/status/:id", updateStatus);
+
+//update a product stock
+router.put("/stock/:id", updateStock);
 
 //delete products by category
 router.delete("/by-category/:categoryId", deleteProductsByCategory);

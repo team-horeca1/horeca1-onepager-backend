@@ -277,6 +277,27 @@ const updateStatus = async (req, res) => {
   }
 };
 
+const updateStock = async (req, res) => {
+  try {
+    const newStock = req.body.stock;
+    await Product.updateOne(
+      { _id: req.params.id },
+      {
+        $set: {
+          stock: newStock,
+        },
+      }
+    );
+    res.status(200).send({
+      message: "Stock Updated Successfully!",
+    });
+  } catch (err) {
+    res.status(500).send({
+      message: err.message,
+    });
+  }
+};
+
 const deleteProduct = async (req, res) => {
   try {
     await Product.deleteOne({ _id: req.params.id });
@@ -561,5 +582,6 @@ module.exports = {
   getProductsByCategory,
   getProductCountByCategory,
   deleteProductsByCategory,
+  updateStock,
 };
 
