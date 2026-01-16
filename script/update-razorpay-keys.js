@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
 require("dotenv").config();
 
-const RAZORPAY_KEY_ID = "rzp_test_Rv3s5MushHY7Ac";
-const RAZORPAY_KEY_SECRET = "43LzqMl4iSAGrkCnOJ0YuitS";
+const RAZORPAY_KEY_ID = "rzp_live_S4TJuplqkxCsZe";
+const RAZORPAY_KEY_SECRET = "5UFv4rIpQblZqJeX9NAsW36r";
 
 async function updateRazorpayKeys() {
   try {
@@ -16,7 +16,7 @@ async function updateRazorpayKeys() {
     console.log("Connected to MongoDB:", mongoose.connection.db.databaseName);
 
     const db = mongoose.connection.db;
-    
+
     // Update storeSetting document in settings collection
     const result = await db.collection("settings").updateOne(
       { name: "storeSetting" },
