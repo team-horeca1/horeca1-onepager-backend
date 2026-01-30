@@ -8,6 +8,7 @@ const {
   addRazorpayOrder,
   createOrderByRazorPay,
   sendEmailInvoiceToCustomer,
+  savePendingPayment,
 } = require("../controller/customerOrderController");
 
 const { emailVerificationLimit } = require("../lib/email-sender/sender");
@@ -23,6 +24,10 @@ router.post("/add/razorpay", addRazorpayOrder);
 
 //add a order by razorpay
 router.post("/create/razorpay", createOrderByRazorPay);
+
+// Save pending payment as safety net (before order creation)
+router.post("/pending-payment", savePendingPayment);
+
 
 //get all order by a user
 router.get("/", getOrderCustomer);

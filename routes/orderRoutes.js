@@ -11,6 +11,8 @@ const {
   getBestSellerProductChart,
   getDashboardCount,
   getDashboardAmount,
+  getPendingPayments,
+  recoverPendingPayment,
 } = require("../controller/orderController");
 
 //get all orders
@@ -30,6 +32,10 @@ router.get("/dashboard-amount", getDashboardAmount);
 
 // chart data for product
 router.get("/best-seller/chart", getBestSellerProductChart);
+
+// Pending payments management (for recovering failed Razorpay orders)
+router.get("/pending-payments", getPendingPayments);
+router.post("/pending-payments/:id/recover", recoverPendingPayment);
 
 //get all order by a user
 router.get("/customer/:id", getOrderCustomer);

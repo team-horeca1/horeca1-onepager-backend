@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin");
 
+// Token for Admin login - 1 year expiry for convenience
 const signInToken = (user) => {
   return jwt.sign(
     {
@@ -15,11 +16,12 @@ const signInToken = (user) => {
     },
     process.env.JWT_SECRET,
     {
-      expiresIn: "1d",
+      expiresIn: process.env.JWT_ADMIN_LIFETIME || "365d", // 1 year for admin
     }
   );
 };
 
+// Token for Customer login - 1 year expiry for convenience
 const generateAccessToken = (user) => {
   return jwt.sign(
     {
@@ -31,15 +33,16 @@ const generateAccessToken = (user) => {
       image: user.image,
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_LIFETIME || "30d" } // 30 days lifetime
+    { expiresIn: process.env.JWT_ACCESS_LIFETIME || "365d" } // 1 year for customers
   );
 };
 
+// Refresh token - 1 year expiry
 const generateRefreshToken = (user) => {
   return jwt.sign(
     { id: user._id },
     process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_LIFETIME || "30d" } // 30 days lifetime
+    { expiresIn: process.env.JWT_REFRESH_LIFETIME || "365d" } // 1 year
   );
 };
 
@@ -69,7 +72,7 @@ const isAuth = async (req, res, next) => {
     }
 
     const token = authorization.split(" ")[1];
-    
+
     // Check if token exists after splitting
     if (!token) {
       return res.status(401).send({

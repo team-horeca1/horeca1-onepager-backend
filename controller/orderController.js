@@ -83,7 +83,7 @@ const getAllOrders = async (req, res) => {
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limits);
-    
+
     // #region agent log
     const fs = require('fs');
     const logPath = 'c:\\Users\\Roger\\Desktop\\horeca1\\Horeca1\\.cursor\\debug.log';
@@ -92,10 +92,10 @@ const getAllOrders = async (req, res) => {
         id: o._id,
         invoice: o.invoice,
         cartLength: o.cart?.length,
-        cartItems: o.cart?.slice(0, 2).map(i => ({id:i.id,title:i.title,sku:i.sku,hsn:i.hsn,unit:i.unit,brand:i.brand}))
+        cartItems: o.cart?.slice(0, 2).map(i => ({ id: i.id, title: i.title, sku: i.sku, hsn: i.hsn, unit: i.unit, brand: i.brand }))
       }));
-      fs.appendFileSync(logPath, JSON.stringify({location:'orderController.js:78',message:'Orders fetched for admin',data:{ordersCount:orders.length,orders:ordersDebug},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})+'\n');
-    } catch(e) {}
+      fs.appendFileSync(logPath, JSON.stringify({ location: 'orderController.js:78', message: 'Orders fetched for admin', data: { ordersCount: orders.length, orders: ordersDebug }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) + '\n');
+    } catch (e) { }
     // #endregion
 
     let methodTotals = [];
@@ -672,6 +672,119 @@ const getDashboardOrders = async (req, res) => {
   }
 };
 
+// Get all pending payments for admin review
+const getPendingPayments = async (req, res) => {
+  try {
+    const PendingPayment = require("../models/PendingPayment");
+
+    const { status, page = 1, limit = 20 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+
+    const totalDoc = await PendingPayment.countDocuments(query);
+    const pendingPayments = await PendingPayment.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .populate("recoveredOrderId", "invoice total createdAt");
+
+    res.send({
+      pendingPayments,
+      totalDoc,
+      page: Number(page),
+      limit: Number(limit),
+    });
+  } catch (err) {
+    res.status(500).send({ message: err.message });
+  }
+};
+
+// Recover a pending payment by creating an order from stored data
+const recoverPendingPayment = async (req, res) => {
+  try {
+    const PendingPayment = require("../models/PendingPayment");
+    const Product = require("../models/Product");
+    const { handleProductQuantity } = require("../lib/stock-controller/others");
+
+    const pendingPayment = await PendingPayment.findById(req.params.id);
+
+    if (!pendingPayment) {
+      return res.status(404).send({ message: "Pending payment not found" });
+    }
+
+    if (pendingPayment.status === "recovered") {
+      return res.status(400).send({
+        message: "Payment already recovered",
+        orderId: pendingPayment.recoveredOrderId
+      });
+    }
+
+    const orderInfo = pendingPayment.orderInfo;
+
+    if (!orderInfo || !orderInfo.cart) {
+      return res.status(400).send({ message: "Invalid order info in pending payment" });
+    }
+
+    // Generate invoice number
+    const lastOrder = await Order.findOne({})
+      .sort({ invoice: -1 })
+      .select("invoice")
+      .lean();
+
+    const nextInvoice = lastOrder ? lastOrder.invoice + 1 : 10000;
+
+    // Create the order
+    const newOrder = new Order({
+      ...orderInfo,
+      user: orderInfo.user || req.user._id,
+      invoice: nextInvoice,
+      razorpay: {
+        razorpayPaymentId: pendingPayment.razorpayPaymentId,
+        razorpayOrderId: pendingPayment.razorpayOrderId,
+        razorpaySignature: pendingPayment.razorpaySignature,
+        amount: pendingPayment.amount,
+      },
+      status: "pending",
+    });
+
+    const order = await newOrder.save();
+
+    // Mark pending payment as recovered
+    pendingPayment.status = "recovered";
+    pendingPayment.recoveredOrderId = order._id;
+    pendingPayment.notes = `Recovered by admin at ${new Date().toISOString()}`;
+    await pendingPayment.save();
+
+    // Handle stock deduction
+    if (order.cart && order.cart.length > 0) {
+      handleProductQuantity(order.cart);
+    }
+
+    console.log("[Recovery] Order recovered successfully:", {
+      orderId: order._id,
+      invoice: order.invoice,
+      paymentId: pendingPayment.razorpayPaymentId,
+    });
+
+    res.status(201).send({
+      message: "Order recovered successfully",
+      order: {
+        _id: order._id,
+        invoice: order.invoice,
+        total: order.total,
+        createdAt: order.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error("[Recovery] Error recovering order:", err.message);
+    res.status(500).send({ message: err.message });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -683,4 +796,6 @@ module.exports = {
   getDashboardRecentOrder,
   getDashboardCount,
   getDashboardAmount,
+  getPendingPayments,
+  recoverPendingPayment,
 };

@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 require("dotenv").config();
 
+// ⚠️ CHANGE THESE TO YOUR RAZORPAY KEYS
+// For TEST MODE: Use keys starting with "rzp_test_"
+// For LIVE MODE: Use keys starting with "rzp_live_"
 const RAZORPAY_KEY_ID = "rzp_live_S4TJuplqkxCsZe";
 const RAZORPAY_KEY_SECRET = "5UFv4rIpQblZqJeX9NAsW36r";
 

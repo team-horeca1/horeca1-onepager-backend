@@ -240,6 +240,19 @@ const createOrderByRazorPay = async (req, res) => {
 };
 
 const addRazorpayOrder = async (req, res) => {
+  console.log("[Razorpay] ========== Add Order Start ==========");
+  console.log("[Razorpay] User ID:", req.user?._id);
+  console.log("[Razorpay] Request body keys:", Object.keys(req.body));
+  console.log("[Razorpay] Payment method:", req.body.paymentMethod);
+  console.log("[Razorpay] Total amount:", req.body.total);
+  console.log("[Razorpay] Cart items count:", req.body.cart?.length);
+  console.log("[Razorpay] Razorpay Payment ID:", req.body.razorpay?.razorpayPaymentId);
+  console.log("[Razorpay] User info:", {
+    name: req.body.user_info?.name,
+    contact: req.body.user_info?.contact,
+    email: req.body.user_info?.email,
+  });
+
   try {
     // Log cart items structure to verify product details are included
     const cartItemsDebug = req.body.cart?.map(item => ({
@@ -261,6 +274,7 @@ const addRazorpayOrder = async (req, res) => {
       .lean();
 
     const nextInvoice = lastOrder ? lastOrder.invoice + 1 : 10000; // start from 10000 if no orders
+    console.log("[Razorpay] Next invoice number:", nextInvoice);
 
     // Calculate GST, Taxable Subtotal, and Total Discount (Product Savings + Coupon)
     let totalGst = 0;
@@ -273,10 +287,12 @@ const addRazorpayOrder = async (req, res) => {
       for (const item of req.body.cart) {
         const product = await Product.findById(item._id);
         if (!product) {
+          console.error("[Razorpay] ERROR: Product not found:", item.title, item._id);
           return res.status(404).send({ message: `Product ${item.title} not found!` });
         }
 
         if (product.stock < item.quantity) {
+          console.error("[Razorpay] ERROR: Insufficient stock for:", item.title, "Available:", product.stock, "Requested:", item.quantity);
           return res.status(400).send({
             message: `Insufficient stock for ${item.title}! Available: ${product.stock}, Requested: ${item.quantity}`,
           });
@@ -328,7 +344,8 @@ const addRazorpayOrder = async (req, res) => {
       vat: totalGst,
     });
     const order = await newOrder.save();
-    console.log("[Razorpay] Order saved:", {
+    console.log("[Razorpay] ========== Order Saved Successfully ==========");
+    console.log("[Razorpay] Order details:", {
       id: order._id,
       invoice: order.invoice,
       total: order.total,
@@ -336,10 +353,53 @@ const addRazorpayOrder = async (req, res) => {
       paymentMethod: order.paymentMethod,
       status: order.status,
       cartItemsCount: order.cart?.length,
+      razorpayPaymentId: order.razorpay?.razorpayPaymentId,
     });
+
+    // Mark pending payment as recovered (if exists)
+    const razorpayPaymentId = req.body.razorpay?.razorpayPaymentId;
+    if (razorpayPaymentId) {
+      try {
+        const PendingPayment = require("../models/PendingPayment");
+        await PendingPayment.findOneAndUpdate(
+          { razorpayPaymentId },
+          { status: "recovered", recoveredOrderId: order._id },
+          { new: true }
+        );
+        console.log("[Razorpay] Marked pending payment as recovered");
+      } catch (pendingErr) {
+        console.log("[Razorpay] No pending payment to update (this is normal)");
+      }
+    }
+
     res.status(201).send(order);
     handleProductQuantity(order.cart);
   } catch (err) {
+    console.error("[Razorpay] ========== Order Creation Failed ==========");
+    console.error("[Razorpay] Error:", err.message);
+    console.error("[Razorpay] Error stack:", err.stack);
+    console.error("[Razorpay] Payment ID that failed:", req.body.razorpay?.razorpayPaymentId);
+
+    // Save to pending payments for recovery if we have a payment ID
+    const razorpayPaymentId = req.body.razorpay?.razorpayPaymentId;
+    if (razorpayPaymentId) {
+      try {
+        const PendingPayment = require("../models/PendingPayment");
+        await PendingPayment.findOneAndUpdate(
+          { razorpayPaymentId },
+          {
+            status: "failed",
+            error: err.message,
+            orderInfo: req.body,
+          },
+          { upsert: true, new: true }
+        );
+        console.error("[Razorpay] Saved failed order to pending payments for recovery");
+      } catch (pendingErr) {
+        console.error("[Razorpay] Could not save to pending payments:", pendingErr.message);
+      }
+    }
+
     res.status(500).send({
       message: err.message,
     });
@@ -647,6 +707,42 @@ const ownerOrderNotificationEmailBody = (option) => {
   `;
 };
 
+// Save pending payment as a safety net before order creation
+// This allows recovery if order creation fails after payment is captured
+const savePendingPayment = async (req, res) => {
+  const PendingPayment = require("../models/PendingPayment");
+
+  console.log("[PendingPayment] Saving pending payment...");
+  console.log("[PendingPayment] Payment ID:", req.body.razorpayPaymentId);
+  console.log("[PendingPayment] Amount:", req.body.amount);
+
+  try {
+    const pendingPayment = new PendingPayment({
+      razorpayPaymentId: req.body.razorpayPaymentId,
+      razorpayOrderId: req.body.razorpayOrderId,
+      razorpaySignature: req.body.razorpaySignature,
+      amount: req.body.amount,
+      orderInfo: req.body.orderInfo,
+      status: "pending",
+    });
+
+    const saved = await pendingPayment.save();
+    console.log("[PendingPayment] Saved successfully:", saved._id);
+
+    res.status(201).send(saved);
+  } catch (err) {
+    // If duplicate key error, the payment was already saved (which is fine)
+    if (err.code === 11000) {
+      console.log("[PendingPayment] Payment already saved (duplicate):", req.body.razorpayPaymentId);
+      const existing = await PendingPayment.findOne({ razorpayPaymentId: req.body.razorpayPaymentId });
+      return res.status(200).send(existing);
+    }
+
+    console.error("[PendingPayment] Error saving:", err.message);
+    res.status(500).send({ message: err.message });
+  }
+};
+
 module.exports = {
   addOrder,
   getOrderById,
@@ -654,5 +750,6 @@ module.exports = {
   createPaymentIntent,
   createOrderByRazorPay,
   addRazorpayOrder,
+  savePendingPayment,
   sendEmailInvoiceToCustomer,
 };
