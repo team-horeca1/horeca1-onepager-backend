@@ -36,9 +36,17 @@ const addOrder = async (req, res) => {
     let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
-      // 1.5️⃣ Check stock for all items before proceeding
+      // 1.5️⃣ Check stock for all items in a single batch query (Optimization)
+      const cartProductIds = req.body.cart.map(item => item._id);
+      const dbProducts = await Product.find({ _id: { $in: cartProductIds } }).lean();
+
+      const productMap = dbProducts.reduce((acc, product) => {
+        acc[product._id.toString()] = product;
+        return acc;
+      }, {});
+
       for (const item of req.body.cart) {
-        const product = await Product.findById(item._id);
+        const product = productMap[item._id.toString()];
         if (!product) {
           return res.status(404).send({ message: `Product ${item.title} not found!` });
         }
@@ -182,9 +190,8 @@ const createOrderByRazorPay = async (req, res) => {
 
     console.log("[Razorpay] ========== Order Creation Start ==========");
     console.log("[Razorpay] Incoming amount (rupees):", incomingAmount);
-    console.log("[Razorpay] Parsed amount (rupees):", amountInRupees);
-    console.log("[Razorpay] Converted amount (paise):", amountInPaise);
-    console.log("[Razorpay] Full request body:", JSON.stringify(req.body, null, 2));
+    // Reduced verbosity for production
+    // console.log("[Razorpay] Full request body:", JSON.stringify(req.body, null, 2));
 
     // Get Razorpay keys from database or environment variables
     const razorpayId = storeSetting?.setting?.razorpay_id || process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_ID;
@@ -288,9 +295,17 @@ const addRazorpayOrder = async (req, res) => {
     let totalTaxableAmount = 0;
 
     if (req.body.cart && Array.isArray(req.body.cart)) {
-      // 1.5️⃣ Check stock for all items before proceeding
+      // 1.5️⃣ Check stock for all items in a single batch query (Optimization)
+      const cartProductIds = req.body.cart.map(item => item._id);
+      const dbProducts = await Product.find({ _id: { $in: cartProductIds } }).lean();
+
+      const productMap = dbProducts.reduce((acc, product) => {
+        acc[product._id.toString()] = product;
+        return acc;
+      }, {});
+
       for (const item of req.body.cart) {
-        const product = await Product.findById(item._id);
+        const product = productMap[item._id.toString()];
         if (!product) {
           console.error("[Razorpay] ERROR: Product not found:", item.title, item._id);
           return res.status(404).send({ message: `Product ${item.title} not found!` });
